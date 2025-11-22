@@ -10,9 +10,152 @@ const cityModal = document.getElementById("city-modal");
 const cityForm = document.getElementById("city-form");
 const citySelect = document.getElementById("city-select");
 const cancelModalButton = document.getElementById("cancel-modal");
+const remainingTimeEl = document.getElementById("remaining-time");
 
 const api = new PrayerTimeApi();
 let currentLocation = null;
+let countdownInterval = null;
+let countdownTarget = null;
+let currentMonthlyTimes = null;
+
+function parsePrayerTime(timeStr, baseDate) {
+    if (!timeStr || typeof timeStr !== "string") {
+        return null;
+    }
+
+    const [hourStr, minuteStr] = timeStr.split(":");
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) {
+        return null;
+    }
+
+    const now = new Date();
+    const base = baseDate || now;
+    return new Date(
+        base.getFullYear(),
+        base.getMonth(),
+        base.getDate(),
+        hour,
+        minute,
+        0,
+        0
+    );
+}
+
+function getNextPrayer(times, now = new Date(), baseDateForTimes = now) {
+    if (!times) {
+        return null;
+    }
+
+    for (const {key} of prayerOrder) {
+        const date = parsePrayerTime(times[key], baseDateForTimes);
+        if (date && date > now) {
+            return {key, target: date};
+        }
+    }
+
+    return null;
+}
+
+function formatRemainingHHmmss(remainingMs) {
+    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [
+        String(hours).padStart(2, "0"),
+        String(minutes).padStart(2, "0"),
+        String(seconds).padStart(2, "0")
+    ].join(":");
+}
+
+function clearCountdown() {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    countdownTarget = null;
+    currentMonthlyTimes = null;
+    if (remainingTimeEl) {
+        remainingTimeEl.textContent = "--:--:--";
+    }
+}
+
+function findTimesForDate(monthlyData, date) {
+    const key = toISODateString(date);
+    return monthlyData.find((entry) => entry?.date?.slice(0, 10) === key);
+}
+
+function recalculateCountdownTarget() {
+    if (!currentMonthlyTimes) {
+        countdownTarget = null;
+        return;
+    }
+
+    const now = new Date();
+    const todayEntry = findTimesForDate(currentMonthlyTimes, now);
+    let next = todayEntry?.times ? getNextPrayer(todayEntry.times, now) : null;
+
+    if (!next) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+        const tomorrowEntry = findTimesForDate(currentMonthlyTimes, tomorrow);
+        if (tomorrowEntry?.times) {
+            next = getNextPrayer(tomorrowEntry.times, now, tomorrow);
+        }
+    }
+
+    countdownTarget = next ? next.target : null;
+}
+
+function updateCountdownDisplay() {
+    if (!remainingTimeEl) {
+        return;
+    }
+
+    if (!countdownTarget) {
+        recalculateCountdownTarget();
+        if (!countdownTarget) {
+            remainingTimeEl.textContent = "--:--:--";
+            return;
+        }
+    }
+
+    const now = new Date();
+    let remainingMs = countdownTarget.getTime() - now.getTime();
+    if (remainingMs <= 0) {
+        recalculateCountdownTarget();
+        if (!countdownTarget) {
+            remainingTimeEl.textContent = "--:--:--";
+            return;
+        }
+        remainingMs = countdownTarget.getTime() - now.getTime();
+    }
+
+    remainingTimeEl.textContent = formatRemainingHHmmss(remainingMs);
+}
+
+function startCountdown(monthlyTimes) {
+    currentMonthlyTimes = Array.isArray(monthlyTimes) ? monthlyTimes : null;
+    if (!currentMonthlyTimes) {
+        clearCountdown();
+        return;
+    }
+
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+    recalculateCountdownTarget();
+    if (!countdownTarget) {
+        clearCountdown();
+        return;
+    }
+
+    updateCountdownDisplay();
+
+    countdownInterval = setInterval(updateCountdownDisplay, 1000);
+}
 
 function formatStateName(rawName) {
     if (!rawName) return "";
@@ -28,6 +171,7 @@ function setStatus(message) {
     li.className = "prayer status";
     li.textContent = message;
     prayerList.appendChild(li);
+    clearCountdown();
 }
 
 function renderTimes(times) {
@@ -107,8 +251,8 @@ async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
 }
 
 function findTodayTimes(monthlyData) {
-    const todayKey = toISODateString(new Date());
-    return monthlyData.find((entry) => entry?.date?.slice(0, 10) === todayKey);
+    const today = new Date();
+    return findTimesForDate(monthlyData, today);
 }
 
 async function loadAndRender(location, {forceRefresh = false} = {}) {
@@ -131,6 +275,7 @@ async function loadAndRender(location, {forceRefresh = false} = {}) {
             return;
         }
         renderTimes(today.times);
+        startCountdown(monthly);
     } catch (error) {
         console.error(error);
         setStatus("Vakitler alınırken hata oluştu.");
