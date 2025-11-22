@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Namaz Vakti</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <div class="title">
+    Namaz Vakti
+    <div class="location" id="location">Yükleniyor…</div>
+  </div>
+  <button id="change-city-btn" type="button" class="secondary">Şehir Değiştir</button>
+</header>
+
+<main>
+  <section class="card">
+    <div class="card-title">Sıradaki vakitler</div>
+    <ul id="prayer-list" class="prayer-list"></ul>
+  </section>
+</main>
+
+<footer>
+  <button id="refresh-btn" type="button">Yenile</button>
+</footer>
+
+<div id="city-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Şehrinizi seçin</h2>
+    <form id="city-form">
+      <label for="city-select">Şehir</label>
+      <select id="city-select" required></select>
+      <div class="modal-actions">
+        <button type="submit">Kaydet</button>
+        <button id="cancel-modal" type="button" class="secondary">İptal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

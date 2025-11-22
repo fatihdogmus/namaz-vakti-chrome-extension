@@ -1,0 +1,162 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 12px;
+    width: 280px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.title {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.location {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.title .location {
+    margin-top: 4px;
+}
+
+main {
+    display: grid;
+    gap: 10px;
+}
+
+.card {
+    background: linear-gradient(145deg, #0b1224, #111a33);
+    border: 1px solid #1f2a44;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.card-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #a5b4fc;
+    margin-bottom: 8px;
+}
+
+.prayer-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.prayer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0b1224;
+    border: 1px solid #1f2a44;
+}
+
+.time {
+    font-variant-numeric: tabular-nums;
+    color: #fbbf24;
+}
+
+footer {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+button {
+    border: none;
+    background: #f8fafc;
+    color: #0f172a;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.secondary {
+    background: transparent;
+    color: #e2e8f0;
+    border: 1px solid #1f2a44;
+}
+
+.secondary:hover {
+    box-shadow: none;
+    border-color: #334166;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+}
+
+.modal-content {
+    width: 100%;
+    max-width: 320px;
+    background: #0b1224;
+    border: 1px solid #1f2a44;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modal-content h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+}
+
+label {
+    display: block;
+    font-size: 12px;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+}
+
+select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #1f2a44;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}

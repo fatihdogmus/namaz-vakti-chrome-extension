@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Namaz Vakti",
+  "short_name": "Namaz",
+  "version": "0.1.0",
+  "description": "Quickly view upcoming prayer times from the browser toolbar.",
+  "action": {
+    "default_title": "Namaz Vakti",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage"
+  ]
+}
