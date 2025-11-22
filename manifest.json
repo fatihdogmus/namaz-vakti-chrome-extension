@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Namaz Vakti",
-  "short_name": "Namaz",
-  "version": "0.1.0",
-  "description": "Quickly view upcoming prayer times from the browser toolbar.",
+  "name": "Ezan Vakti (Türkiye)",
+  "short_name": "Ezan Vakti (Türkiye)",
+  "version": "1.0.0",
+  "description": "Türkiyede'ki iller için namaz vakitlerinin görüntülenmesi, ve vakit bazlı bildirim kurulmasını sağlayan uygulama",
   "host_permissions": [
     "https://ezanvakti.imsakiyem.com/*"
   ],
@@ -14,7 +14,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Namaz Vakti",
+    "default_title": "Namaz Vakitleri",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"

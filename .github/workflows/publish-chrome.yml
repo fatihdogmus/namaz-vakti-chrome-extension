@@ -1,0 +1,63 @@
+name: Publish Chrome Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Manifest version (X.Y.Z)"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version input
+        run: |
+          if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be in X.Y.Z format"
+            exit 1
+          fi
+
+      - name: Update manifest version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          tmp=$(mktemp)
+          jq --arg ver "$VERSION" '.version = $ver' manifest.json > "$tmp"
+          mv "$tmp" manifest.json
+
+      - name: Commit version bump
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: bump version to $VERSION"
+            git push
+          fi
+
+      - name: Build extension zip
+        run: |
+          zip -r extension.zip . \
+            -x '*.git*' '.github/*' '*node_modules/*' '*.iml' '*dist/*'
+
+      - name: Upload and publish to Chrome Web Store
+        uses: Klemensas/chrome-extension-upload-action@v1.4.0
+        with:
+          refresh-token: ${{ secrets.WEBSTORE_REFRESH_TOKEN }}
+          client-id: ${{ secrets.WEBSTORE_CLIENT_ID }}
+          client-secret: ${{ secrets.WEBSTORE_CLIENT_SECRET }}
+          extension-id: ${{ secrets.WEBSTORE_EXTENSION_ID }}
+          file-name: extension.zip
+          publish: true
