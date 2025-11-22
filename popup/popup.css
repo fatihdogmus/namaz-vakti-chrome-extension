@@ -76,6 +76,11 @@ main {
     color: #fbbf24;
 }
 
+.prayer.status {
+    justify-content: center;
+    color: #94a3b8;
+}
+
 footer {
     margin-top: 12px;
     display: flex;

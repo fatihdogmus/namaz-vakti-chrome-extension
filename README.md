@@ -1,12 +1,14 @@
 # Namaz Vakti Chrome Extension
 
-Basic scaffolding for a Manifest V3 extension with a popup UI and a background service worker.
+Manifest V3 toolbar popup (Turkish UI) that asks for your şehir, fetches monthly prayer times from
+ezanvakti.imsakiyem.com, caches them locally, and shows today’s times.
 
 ## Files
 
-- `manifest.json` — extension metadata and entry points.
+- `manifest.json` — extension metadata, host permissions, and entry points.
 - `background.js` — service worker that seeds default settings on install.
-- `popup.html`, `popup.css`, `popup.js` — toolbar popup UI with placeholder prayer times and a city selector in Turkish.
+- `popup/` — popup UI assets (`popup.html`, `popup.css`) and JS modules (`js/` with popup logic, constants, and API
+  client).
 
 ## Load in Chrome
 
@@ -14,5 +16,3 @@ Basic scaffolding for a Manifest V3 extension with a popup UI and a background s
 2. Enable **Developer mode** (top right).
 3. Click **Load unpacked** and select this folder.
 4. Pin the extension and open the toolbar icon to see the popup.
-
-You can start wiring real data and options into `popup.js` and the background worker.
