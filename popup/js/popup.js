@@ -10,7 +10,17 @@ const cityModal = document.getElementById("city-modal");
 const cityForm = document.getElementById("city-form");
 const citySelect = document.getElementById("city-select");
 const cancelModalButton = document.getElementById("cancel-modal");
+const notificationsButton = document.getElementById("notifications-btn");
+const notificationsModal = document.getElementById("notifications-modal");
+const closeNotificationsButton = document.getElementById("close-notifications");
 const remainingTimeEl = document.getElementById("remaining-time");
+const hijriDateEl = document.getElementById("hijri-date");
+const notificationSelects = {
+    ogle: document.getElementById("notif-ogle"),
+    ikindi: document.getElementById("notif-ikindi"),
+    aksam: document.getElementById("notif-aksam"),
+    yatsi: document.getElementById("notif-yatsi")
+};
 
 const api = new PrayerTimeApi();
 let currentLocation = null;
@@ -80,6 +90,55 @@ function clearCountdown() {
     if (remainingTimeEl) {
         remainingTimeEl.textContent = "--:--:--";
     }
+}
+
+function formatHijriDate(date) {
+    try {
+        const formatter = new Intl.DateTimeFormat("tr-TR-u-ca-islamic", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+        });
+        return formatter.format(date);
+    } catch (error) {
+        console.error("Hijri date formatting failed:", error);
+        return "";
+    }
+}
+
+function updateHijriDate() {
+    if (!hijriDateEl) {
+        return;
+    }
+    const text = formatHijriDate(new Date());
+    hijriDateEl.textContent = text || "";
+}
+
+function populateNotificationSelects() {
+    const options = [
+        {value: "0", label: "Bildirim yok"},
+        {value: "10", label: "10 dk önce"},
+        {value: "15", label: "15 dk önce"},
+        {value: "20", label: "20 dk önce"},
+        {value: "25", label: "25 dk önce"},
+        {value: "30", label: "30 dk önce"},
+        {value: "35", label: "35 dk önce"},
+        {value: "40", label: "40 dk önce"},
+        {value: "45", label: "45 dk önce"}
+    ];
+
+    Object.values(notificationSelects).forEach((select) => {
+        if (!select) {
+            return;
+        }
+        select.innerHTML = "";
+        options.forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = opt.value;
+            option.textContent = opt.label;
+            select.appendChild(option);
+        });
+    });
 }
 
 function findTimesForDate(monthlyData, date) {
@@ -172,6 +231,9 @@ function setStatus(message) {
     li.textContent = message;
     prayerList.appendChild(li);
     clearCountdown();
+    if (hijriDateEl) {
+        hijriDateEl.textContent = "";
+    }
 }
 
 function renderTimes(times) {
@@ -204,6 +266,20 @@ function showCityModal() {
 
 function hideCityModal() {
     cityModal.classList.add("hidden");
+}
+
+function showNotificationsModal() {
+    if (!notificationsModal) {
+        return;
+    }
+    notificationsModal.classList.remove("hidden");
+}
+
+function hideNotificationsModal() {
+    if (!notificationsModal) {
+        return;
+    }
+    notificationsModal.classList.add("hidden");
 }
 
 function storageGet(keys) {
@@ -255,6 +331,55 @@ function findTodayTimes(monthlyData) {
     return findTimesForDate(monthlyData, today);
 }
 
+function applyNotificationSettings(notificationConfig = {}) {
+    const allowedValues = new Set(["0", "10", "15", "20", "25", "30", "35", "40", "45"]);
+    Object.entries(notificationSelects).forEach(([key, select]) => {
+        if (!select) {
+            return;
+        }
+        const minutes = notificationConfig[key];
+        const value = minutes != null ? String(minutes) : "0";
+        select.value = allowedValues.has(value) ? value : "0";
+    });
+}
+
+async function saveNotificationSettings() {
+    const {settings = {}} = await storageGet(["settings"]);
+    const currentConfig = settings.notificationConfig || {};
+    const updatedConfig = {...currentConfig};
+
+    Object.entries(notificationSelects).forEach(([key, select]) => {
+        if (!select) {
+            return;
+        }
+        const minutes = Number(select.value || "0");
+        if (!minutes) {
+            delete updatedConfig[key];
+        } else {
+            updatedConfig[key] = minutes;
+        }
+    });
+
+    const updatedSettings = {
+        ...settings,
+        notificationConfig: updatedConfig
+    };
+    await storageSet({settings: updatedSettings});
+}
+
+function attachNotificationListeners() {
+    Object.values(notificationSelects).forEach((select) => {
+        if (!select) {
+            return;
+        }
+        select.addEventListener("change", () => {
+            saveNotificationSettings().catch((error) => {
+                console.error("Bildirim ayarları kaydedilemedi:", error);
+            });
+        });
+    });
+}
+
 async function loadAndRender(location, {forceRefresh = false} = {}) {
     if (!location) {
         setStatus("Şehir seçilmedi");
@@ -262,9 +387,7 @@ async function loadAndRender(location, {forceRefresh = false} = {}) {
         return;
     }
 
-    locationEl.textContent = `${formatStateName(location.stateName)} (${formatStateName(
-        location.districtName || ""
-    )})`;
+    locationEl.textContent = formatStateName(location.stateName);
     setStatus("Vakitler getiriliyor...");
 
     try {
@@ -276,6 +399,7 @@ async function loadAndRender(location, {forceRefresh = false} = {}) {
         }
         renderTimes(today.times);
         startCountdown(monthly);
+        updateHijriDate();
     } catch (error) {
         console.error(error);
         setStatus("Vakitler alınırken hata oluştu.");
@@ -314,6 +438,8 @@ async function saveCity(stateId) {
 async function loadSettings() {
     const {settings} = await storageGet(["settings"]);
     const storedLocation = settings?.location;
+    applyNotificationSettings(settings?.notificationConfig || {});
+
     if (storedLocation && typeof storedLocation === "object" && storedLocation.stateId) {
         currentLocation = storedLocation;
         citySelect.value = storedLocation.stateId;
@@ -336,6 +462,14 @@ refreshButton.addEventListener("click", () => {
 changeCityButton.addEventListener("click", showCityModal);
 cancelModalButton.addEventListener("click", hideCityModal);
 
+if (notificationsButton) {
+    notificationsButton.addEventListener("click", showNotificationsModal);
+}
+
+if (closeNotificationsButton) {
+    closeNotificationsButton.addEventListener("click", hideNotificationsModal);
+}
+
 cityForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const stateId = citySelect.value;
@@ -347,6 +481,8 @@ cityForm.addEventListener("submit", (event) => {
 
 document.addEventListener("DOMContentLoaded", () => {
     populateCitySelect();
+    populateNotificationSelects();
+    attachNotificationListeners();
     setStatus("Şehir seçin");
     loadSettings().catch((error) => {
         console.error(error);

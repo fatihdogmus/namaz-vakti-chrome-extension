@@ -22,12 +22,15 @@
       <span class="remaining-label">Sonraki vakite</span>
       <span id="remaining-time" class="remaining-time">--:--:--</span>
     </div>
+    <div id="hijri-date" class="hijri-date"></div>
     <ul id="prayer-list" class="prayer-list"></ul>
   </section>
+
 </main>
 
 <footer>
   <button id="refresh-btn" type="button">Yenile</button>
+  <button id="notifications-btn" type="button" class="secondary">Bildirimler</button>
 </footer>
 
 <div id="city-modal" class="modal hidden">
@@ -39,6 +42,35 @@
       <div class="modal-actions">
         <button type="submit">Kaydet</button>
         <button id="cancel-modal" type="button" class="secondary">İptal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="notifications-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Bildirimler</h2>
+    <form id="notifications-form">
+      <ul class="config-list">
+        <li class="config-row">
+          <label for="notif-ogle" class="config-label">Öğle</label>
+          <select id="notif-ogle" class="config-select"></select>
+        </li>
+        <li class="config-row">
+          <label for="notif-ikindi" class="config-label">İkindi</label>
+          <select id="notif-ikindi" class="config-select"></select>
+        </li>
+        <li class="config-row">
+          <label for="notif-aksam" class="config-label">Akşam</label>
+          <select id="notif-aksam" class="config-select"></select>
+        </li>
+        <li class="config-row">
+          <label for="notif-yatsi" class="config-label">Yatsı</label>
+          <select id="notif-yatsi" class="config-select"></select>
+        </li>
+      </ul>
+      <div class="modal-actions">
+        <button id="close-notifications" type="button" class="secondary">Kapat</button>
       </div>
     </form>
   </div>

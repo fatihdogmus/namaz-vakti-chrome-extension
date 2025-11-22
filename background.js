@@ -3,6 +3,7 @@ import {prayerOrder} from "./popup/js/prayerOrder.js";
 
 const BADGE_ALARM_NAME = "updateBadge";
 const BADGE_UPDATE_PERIOD_MINUTES = 1;
+const NOTIFICATION_PRAYERS = ["ogle", "ikindi", "aksam", "yatsi"];
 
 const api = new PrayerTimeApi();
 
@@ -95,6 +96,11 @@ function getNextPrayer(times, now = new Date(), baseDateForTimes = now) {
     return null;
 }
 
+function getPrayerLabel(key) {
+    const match = prayerOrder.find((entry) => entry.key === key);
+    return match?.label || key;
+}
+
 function formatRemainingHHmm(remainingMs) {
     const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
     const hours = Math.floor(totalSeconds / 3600);
@@ -109,11 +115,99 @@ function formatRemainingHHmm(remainingMs) {
     return `${hours}h`; // e.g. "10h", "12h"
 }
 
+function normalizeNotificationConfig(settings) {
+    const rawConfig = settings?.notificationConfig || {};
+    const normalized = {};
+    NOTIFICATION_PRAYERS.forEach((key) => {
+        const value = Number(rawConfig[key] ?? 0);
+        if (Number.isFinite(value) && value > 0) {
+            normalized[key] = value;
+        }
+    });
+    return normalized;
+}
+
+async function maybeSendNotifications(now, monthly, settings) {
+    const notificationConfig = normalizeNotificationConfig(settings);
+    if (!Object.keys(notificationConfig).length) {
+        return;
+    }
+
+    const {notificationLog = {}} = await storageGet(["notificationLog"]);
+
+    const todayEntry = findTimesForDate(monthly, now);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowEntry = findTimesForDate(monthly, tomorrow);
+
+    const windows = [
+        {date: now, entry: todayEntry},
+        {date: tomorrow, entry: tomorrowEntry}
+    ];
+
+    for (const {date, entry} of windows) {
+        if (!entry?.times) {
+            continue;
+        }
+
+        for (const key of NOTIFICATION_PRAYERS) {
+            const offsetMinutes = notificationConfig[key];
+            if (!offsetMinutes) {
+                continue;
+            }
+
+            const timeStr = entry.times[key];
+            const prayerTime = parsePrayerTime(timeStr, date);
+            if (!prayerTime) {
+                continue;
+            }
+
+            const notificationTime = new Date(
+                prayerTime.getTime() - offsetMinutes * 60 * 1000
+            );
+            const windowMs = BADGE_UPDATE_PERIOD_MINUTES * 60 * 1000;
+            const deltaMs = now.getTime() - notificationTime.getTime();
+            if (deltaMs < 0 || deltaMs >= windowMs) {
+                continue;
+            }
+
+            const logKey = `${toISODateString(date)}-${key}-${offsetMinutes}`;
+            if (notificationLog[logKey]) {
+                continue;
+            }
+
+            const label = getPrayerLabel(key);
+            const title = `${label} vaktine ${offsetMinutes} dakika kaldı`;
+            const message = `Bugünkü ${label} vakti: ${timeStr}`;
+
+            try {
+                chrome.notifications.create(
+                    `prayer-${logKey}`,
+                    {
+                        type: "basic",
+                        iconUrl: "icons/icon128.png",
+                        title,
+                        message,
+                        priority: 0
+                    },
+                    () => chrome.runtime.lastError && console.warn(chrome.runtime.lastError)
+                );
+            } catch (error) {
+                console.error("Bildirim oluşturulamadı:", error);
+            }
+
+            notificationLog[logKey] = Date.now();
+        }
+    }
+
+    await storageSet({notificationLog});
+}
+
 async function updateBadge() {
     try {
         const now = new Date();
 
-        const {settings} = await storageGet(["settings"]);
+        const {settings = {}} = await storageGet(["settings"]);
         const location = settings?.location;
 
         if (!location) {
@@ -126,6 +220,8 @@ async function updateBadge() {
             chrome.action.setBadgeText({text: ""});
             return;
         }
+
+        await maybeSendNotifications(now, monthly, settings);
 
         const todayEntry = findTimesForDate(monthly, now);
         let next = todayEntry?.times ? getNextPrayer(todayEntry.times, now) : null;
