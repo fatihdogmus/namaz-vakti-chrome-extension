@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ezan Vakti (Türkiye)",
   "short_name": "Ezan Vakti (Türkiye)",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Türkiyede'ki iller için namaz vakitlerinin görüntülenmesi, ve vakit bazlı bildirim kurulmasını sağlayan uygulama",
   "host_permissions": [
     "https://raw.githubusercontent.com/*"
