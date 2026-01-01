@@ -90,6 +90,7 @@ const cities = [
 const BASE_URL = "https://namazvakitleri.diyanet.gov.tr";
 const DOWNLOAD_DIR = path.resolve(__dirname, "data");
 const DOWNLOAD_DELAY_MS = 1000;
+const SELECT_TIMEOUT_MS = 60000;
 const HEADLESS =
   process.env.PLAYWRIGHT_HEADLESS === "1" ||
   process.env.PLAYWRIGHT_HEADLESS === "true";
@@ -269,9 +270,34 @@ async function scrape() {
   const browser = await chromium.launch({ headless: HEADLESS });
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
+  page.setDefaultTimeout(SELECT_TIMEOUT_MS);
 
   try {
-    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    let loaded = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await page.goto(BASE_URL, {
+          waitUntil: "domcontentloaded",
+          timeout: SELECT_TIMEOUT_MS
+        });
+        await page.waitForLoadState("networkidle", { timeout: SELECT_TIMEOUT_MS });
+        await page.waitForSelector("select.country-select", {
+          state: "attached",
+          timeout: SELECT_TIMEOUT_MS
+        });
+        loaded = true;
+        break;
+      } catch (error) {
+        console.warn(`Initial load failed (attempt ${attempt}):`, error);
+        if (attempt === 3) {
+          throw error;
+        }
+      }
+    }
+
+    if (!loaded) {
+      throw new Error("Initial page load failed");
+    }
 
     const countrySelect = page.locator("select.country-select");
     const citySelect = page.locator("select.city-select");
