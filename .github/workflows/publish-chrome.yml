@@ -34,20 +34,8 @@ jobs:
           jq --arg ver "$VERSION" '.version = $ver' manifest.json > "$tmp"
           mv "$tmp" manifest.json
 
-      - name: Commit version bump
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add manifest.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: bump version to $VERSION"
-            git push
-          fi
-
       - name: Build extension zip
+
         run: |
           zip -r extension.zip . \
             -x '*.git*' '.github/*' '*node_modules/*' '*.iml' '*dist/*' \
@@ -92,7 +80,21 @@ jobs:
             "${PUBLISH_URL}")
           if [[ "$PUBLISH_STATUS" != "200" ]]; then
             echo "Publish failed with status $PUBLISH_STATUS"
-            cat publish-response.json
+          cat publish-response.json
+
+      - name: Commit version bump
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: bump version to $VERSION"
+            git push
+          fi
+
             exit 1
           fi
 
