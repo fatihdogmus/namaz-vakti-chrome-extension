@@ -135,7 +135,7 @@ function formatRemainingHHmm(remainingMs) {
     if (hours < 10) {
         return `${hours}:${String(minutes).padStart(2, "0")}`; // e.g. "8:45"
     }
-    return `${hours}h`; // e.g. "10h", "12h"
+    return `${hours}s`; // e.g. "10s", "12s"
 }
 
 function normalizeNotificationConfig(settings) {

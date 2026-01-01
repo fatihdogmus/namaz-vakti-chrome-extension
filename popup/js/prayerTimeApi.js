@@ -1,4 +1,4 @@
-const DEFAULT_BASE = "https://raw.githubusercontent.com/fatihdogmus/namaz-vakti-chrome-extension/refs/heads/master/data/json";
+const DEFAULT_BASE = "https://raw.githubusercontent.com/fatihdogmus/namaz-vakti-chrome-extension/master/data/json";
 const DB_NAME = "prayer-times";
 const DB_VERSION = 1;
 const STORE_NAME = "cities";
