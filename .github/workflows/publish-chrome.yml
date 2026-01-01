@@ -56,10 +56,44 @@ jobs:
 
 
       - name: Upload and publish to Chrome Web Store
-        uses: Klemensas/chrome-extension-upload-action@v1.3
-        with:
-          refresh-token: ${{ secrets.WEBSTORE_REFRESH_TOKEN }}
-          client-id: ${{ secrets.WEBSTORE_CLIENT_ID }}
-          client-secret: ${{ secrets.WEBSTORE_CLIENT_SECRET }}
-          app-id: ${{ secrets.WEBSTORE_EXTENSION_ID }}
-          file-name: extension.zip
+        env:
+          WEBSTORE_REFRESH_TOKEN: ${{ secrets.WEBSTORE_REFRESH_TOKEN }}
+          WEBSTORE_CLIENT_ID: ${{ secrets.WEBSTORE_CLIENT_ID }}
+          WEBSTORE_CLIENT_SECRET: ${{ secrets.WEBSTORE_CLIENT_SECRET }}
+          WEBSTORE_PUBLISHER_ID: ${{ secrets.WEBSTORE_PUBLISHER_ID }}
+          WEBSTORE_EXTENSION_ID: ${{ secrets.WEBSTORE_EXTENSION_ID }}
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -s "https://oauth2.googleapis.com/token" \
+            -d "client_secret=${WEBSTORE_CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${WEBSTORE_REFRESH_TOKEN}&client_id=${WEBSTORE_CLIENT_ID}" \
+            | jq -r '.access_token')
+          if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+            echo "Failed to obtain access token"
+            exit 1
+          fi
+
+          UPLOAD_URL="https://chromewebstore.googleapis.com/upload/v2/publishers/${WEBSTORE_PUBLISHER_ID}/items/${WEBSTORE_EXTENSION_ID}:upload"
+          PUBLISH_URL="https://chromewebstore.googleapis.com/v2/publishers/${WEBSTORE_PUBLISHER_ID}/items/${WEBSTORE_EXTENSION_ID}:publish"
+
+          UPLOAD_STATUS=$(curl -s -o upload-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -X POST -T extension.zip \
+            "${UPLOAD_URL}")
+          if [[ "$UPLOAD_STATUS" != "200" ]]; then
+            echo "Upload failed with status $UPLOAD_STATUS"
+            cat upload-response.json
+            exit 1
+          fi
+
+          PUBLISH_STATUS=$(curl -s -o publish-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -X POST \
+            "${PUBLISH_URL}")
+          if [[ "$PUBLISH_STATUS" != "200" ]]; then
+            echo "Publish failed with status $PUBLISH_STATUS"
+            cat publish-response.json
+            exit 1
+          fi
+
+          cat publish-response.json
+
