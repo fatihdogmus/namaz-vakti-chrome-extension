@@ -61,6 +61,5 @@ jobs:
           refresh-token: ${{ secrets.WEBSTORE_REFRESH_TOKEN }}
           client-id: ${{ secrets.WEBSTORE_CLIENT_ID }}
           client-secret: ${{ secrets.WEBSTORE_CLIENT_SECRET }}
-          extension-id: ${{ secrets.WEBSTORE_EXTENSION_ID }}
+          app-id: ${{ secrets.WEBSTORE_EXTENSION_ID }}
           file-name: extension.zip
-          publish: true
