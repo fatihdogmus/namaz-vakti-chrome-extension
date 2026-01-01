@@ -80,6 +80,10 @@ jobs:
             "${PUBLISH_URL}")
           if [[ "$PUBLISH_STATUS" != "200" ]]; then
             echo "Publish failed with status $PUBLISH_STATUS"
+            cat publish-response.json
+            exit 1
+          fi
+
           cat publish-response.json
 
       - name: Commit version bump
@@ -94,9 +98,3 @@ jobs:
             git commit -m "chore: bump version to $VERSION"
             git push
           fi
-
-            exit 1
-          fi
-
-          cat publish-response.json
-
