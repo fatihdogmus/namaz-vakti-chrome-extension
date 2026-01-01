@@ -90,7 +90,8 @@ const cities = [
 const BASE_URL = "https://namazvakitleri.diyanet.gov.tr";
 const DOWNLOAD_DIR = path.resolve(__dirname, "data");
 const DOWNLOAD_DELAY_MS = 1000;
-const SELECT_TIMEOUT_MS = 60000;
+const SELECT_TIMEOUT_MS = 10000;
+const DIAGNOSTICS_DIR = path.resolve(DOWNLOAD_DIR, "diagnostics");
 const HEADLESS =
   process.env.PLAYWRIGHT_HEADLESS === "1" ||
   process.env.PLAYWRIGHT_HEADLESS === "true";
@@ -99,6 +100,37 @@ const CLEANUP_XLSX =
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function setupNetworkLogging(page) {
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      console.warn(
+        `HTTP ${response.status()} ${response.request().method()} ${response.url()}`
+      );
+    }
+  });
+  page.on("requestfailed", (request) => {
+    console.warn(
+      `Request failed ${request.method()} ${request.url()} ${request.failure()?.errorText}`
+    );
+  });
+}
+
+async function captureDiagnostics(page, attempt) {
+  try {
+    await fs.promises.mkdir(DIAGNOSTICS_DIR, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const baseName = `load-failure-${attempt}-${timestamp}`;
+    const screenshotPath = path.join(DIAGNOSTICS_DIR, `${baseName}.png`);
+    const htmlPath = path.join(DIAGNOSTICS_DIR, `${baseName}.html`);
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    const html = await page.content();
+    await fs.promises.writeFile(htmlPath, html);
+    console.warn(`Diagnostics saved: ${screenshotPath} ${htmlPath}`);
+  } catch (error) {
+    console.warn("Diagnostics capture failed:", error);
+  }
 }
 
 function toAsciiSlug(value) {
@@ -267,14 +299,31 @@ function toCityLabel(value) {
 async function scrape() {
   await fs.promises.mkdir(DOWNLOAD_DIR, { recursive: true });
 
-  const browser = await chromium.launch({ headless: HEADLESS });
-  const context = await browser.newContext({ acceptDownloads: true });
-  const page = await context.newPage();
-  page.setDefaultTimeout(SELECT_TIMEOUT_MS);
+  const browser = await chromium.launch({ headless: true });
+  let context = null;
+  let page = null;
 
   try {
     let loaded = false;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const useFallback = attempt > 1;
+      if (context) {
+        await context.close().catch(() => undefined);
+      }
+
+      context = await browser.newContext({
+        acceptDownloads: true,
+        userAgent: useFallback
+          ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          : undefined,
+        viewport: useFallback ? { width: 1280, height: 720 } : undefined,
+        locale: useFallback ? "tr-TR" : undefined,
+        timezoneId: useFallback ? "Europe/Istanbul" : undefined
+      });
+      page = await context.newPage();
+      page.setDefaultTimeout(SELECT_TIMEOUT_MS);
+      setupNetworkLogging(page);
+
       try {
         await page.goto(BASE_URL, {
           waitUntil: "domcontentloaded",
@@ -289,13 +338,16 @@ async function scrape() {
         break;
       } catch (error) {
         console.warn(`Initial load failed (attempt ${attempt}):`, error);
+        if (page) {
+          await captureDiagnostics(page, attempt);
+        }
         if (attempt === 3) {
           throw error;
         }
       }
     }
 
-    if (!loaded) {
+    if (!loaded || !page) {
       throw new Error("Initial page load failed");
     }
 
@@ -331,7 +383,7 @@ async function scrape() {
         const excelButton = page.locator(".dt-buttons .buttons-excel");
         await excelButton.waitFor({ state: "visible" });
 
-        const downloadPromise = page.waitForEvent("download", { timeout: 60000 });
+        const downloadPromise = page.waitForEvent("download", { timeout: 10000 });
         await excelButton.click();
         const download = await downloadPromise;
 
@@ -346,7 +398,9 @@ async function scrape() {
       }
     }
   } finally {
-    await context.close();
+    if (context) {
+      await context.close().catch(() => undefined);
+    }
     await browser.close();
   }
 

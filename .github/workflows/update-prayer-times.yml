@@ -29,9 +29,9 @@ jobs:
 
       - name: Run scraper
         env:
-          PLAYWRIGHT_HEADLESS: "true"
+          PLAYWRIGHT_HEADLESS: "false"
           CLEANUP_XLSX: "true"
-        run: node scrape-diyanet.js
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node scrape-diyanet.js
 
       - name: Commit and push changes
         run: |
