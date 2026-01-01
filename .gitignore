@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# build output
+dist/
+build/
+out/
+
+# coverage
+coverage/
+
+# caches
+.cache/
+.parcel-cache/
+.npm/
+.pnpm-store/
+
+# env
+.env
+.env.*
+
+# editor/OS
+.DS_Store
+Thumbs.db
+
+# misc
+*.log
+**/*.xlsx

@@ -1,0 +1,26 @@
+{
+  "name": "namaz-vakti-chrome-extension",
+  "version": "1.0.0",
+  "description": "Manifest V3 toolbar popup (Turkish UI) that asks for your şehir, fetches monthly prayer times from\r ezanvakti.imsakiyem.com, caches them locally, and shows today’s times.",
+  "homepage": "https://github.com/fatihdogmus/namaz-vakti-chrome-extension#readme",
+  "bugs": {
+    "url": "https://github.com/fatihdogmus/namaz-vakti-chrome-extension/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatihdogmus/namaz-vakti-chrome-extension.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "playwright": "^1.57.0"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

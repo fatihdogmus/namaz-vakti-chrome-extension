@@ -106,13 +106,25 @@ function formatHijriDate(date) {
     }
 }
 
-function updateHijriDate() {
+function formatHijriFromApi(hijri) {
+    if (!hijri) {
+        return "";
+    }
+    const day = hijri.day ? String(hijri.day) : "";
+    const monthName = hijri.month?.en || "";
+    const year = hijri.year ? String(hijri.year) : "";
+    const parts = [day, monthName, year].filter(Boolean);
+    return parts.join(" ");
+}
+
+function updateHijriDate(hijri) {
     if (!hijriDateEl) {
         return;
     }
-    const text = formatHijriDate(new Date());
+    const text = formatHijriFromApi(hijri) || formatHijriDate(new Date());
     hijriDateEl.textContent = text || "";
 }
+
 
 function populateNotificationSelects() {
     const options = [
@@ -305,14 +317,16 @@ async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
     const {prayerCache = {}} = await storageGet(["prayerCache"]);
 
     const today = new Date();
-    const startDate = toISODateString(new Date(today.getFullYear(), today.getMonth(), 1));
-    const cacheKey = `${location.districtId}-${startDate}`;
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const cityName = location?.cityName || formatStateName(location?.stateName);
+    const cacheKey = `${cityName}-${year}-${String(month).padStart(2, "0")}`;
 
     if (!forceRefresh && prayerCache[cacheKey]?.data?.length) {
         return prayerCache[cacheKey].data;
     }
 
-    const data = await api.getMonthlyTimes(location.districtId, startDate);
+    const data = await api.getMonthlyTimes(cityName, year, month);
 
     const updatedCache = {
         ...prayerCache,
@@ -325,6 +339,7 @@ async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
     await storageSet({prayerCache: updatedCache});
     return data;
 }
+
 
 function findTodayTimes(monthlyData) {
     const today = new Date();
@@ -399,7 +414,8 @@ async function loadAndRender(location, {forceRefresh = false} = {}) {
         }
         renderTimes(today.times);
         startCountdown(monthly);
-        updateHijriDate();
+        updateHijriDate(today.hijri);
+
     } catch (error) {
         console.error(error);
         setStatus("Vakitler alınırken hata oluştu.");
@@ -416,12 +432,10 @@ async function saveCity(stateId) {
     setStatus("Şehir ayarlanıyor...");
 
     try {
-        const district = await api.selectDistrictForState(selectedState);
         const location = {
             stateId,
             stateName: selectedState.name,
-            districtId: district.districtId,
-            districtName: district.districtName
+            cityName: formatStateName(selectedState.name)
         };
         const {settings = {}} = await storageGet(["settings"]);
         await storageSet({settings: {...settings, location}});
@@ -433,6 +447,7 @@ async function saveCity(stateId) {
         console.error(error);
         setStatus("Şehir seçilirken hata oluştu.");
     }
+
 }
 
 async function loadSettings() {
@@ -441,11 +456,22 @@ async function loadSettings() {
     applyNotificationSettings(settings?.notificationConfig || {});
 
     if (storedLocation && typeof storedLocation === "object" && storedLocation.stateId) {
-        currentLocation = storedLocation;
+        const selectedState = states.find((state) => state.id === storedLocation.stateId);
+        const needsUpdate = !storedLocation.stateName || !storedLocation.cityName;
+        const normalizedLocation = {
+            ...storedLocation,
+            stateName: storedLocation.stateName || selectedState?.name,
+            cityName: storedLocation.cityName || formatStateName(storedLocation.stateName || selectedState?.name)
+        };
+        if (needsUpdate && normalizedLocation.cityName) {
+            await storageSet({settings: {...settings, location: normalizedLocation}});
+        }
+        currentLocation = normalizedLocation;
         citySelect.value = storedLocation.stateId;
-        await loadAndRender(storedLocation);
+        await loadAndRender(normalizedLocation);
         return;
     }
+
 
     locationEl.textContent = "Şehir seçilmedi";
     showCityModal();

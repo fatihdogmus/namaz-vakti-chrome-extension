@@ -1,4 +1,4 @@
-const DEFAULT_BASE = "https://ezanvakti.imsakiyem.com";
+const DEFAULT_BASE = "https://api.aladhan.com/v1";
 
 export class PrayerTimeApi {
     constructor(baseUrl = DEFAULT_BASE) {
@@ -11,41 +11,63 @@ export class PrayerTimeApi {
         if (!response.ok) {
             throw new Error(`İstek başarısız: ${response.status}`);
         }
-        return response.json();
-    }
-
-    async getDistricts(stateId) {
-        const {data = []} = await this.fetchJson(
-            `/api/locations/districts?stateId=${stateId}`
-        );
-        return data;
-    }
-
-    chooseDistrict(state, districts) {
-        if (!districts.length) {
-            throw new Error("İlçe bulunamadı");
+        const payload = await response.json();
+        if (payload?.code && payload.code !== 200) {
+            throw new Error(`İstek başarısız: ${payload.code}`);
         }
+        return payload;
+    }
 
-        const targetName = state.name.toLocaleUpperCase("tr-TR");
-        const exactMatch = districts.find((d) => d.name === targetName);
-        const merkezMatch = districts.find((d) => d.name.includes("MERKEZ"));
-        const chosen = exactMatch || merkezMatch || districts[0];
+    normalizeTimeString(value) {
+        if (!value || typeof value !== "string") {
+            return null;
+        }
+        return value.split(" ")[0];
+    }
 
+    toIsoDateString(gregorianDate) {
+        if (!gregorianDate) {
+            return null;
+        }
+        const parts = gregorianDate.split("-");
+        if (parts.length !== 3) {
+            return null;
+        }
+        const [day, month, year] = parts;
+        return `${year}-${month}-${day}`;
+    }
+
+    mapMonthlyEntry(entry) {
+        const timings = entry?.timings || {};
+        const isoDate = this.toIsoDateString(entry?.date?.gregorian?.date);
+        if (!isoDate) {
+            return null;
+        }
         return {
-            districtId: chosen._id || chosen.id,
-            districtName: chosen.name
+            date: isoDate,
+            times: {
+                imsak: this.normalizeTimeString(timings.Fajr),
+                gunes: this.normalizeTimeString(timings.Sunrise),
+                ogle: this.normalizeTimeString(timings.Dhuhr),
+                ikindi: this.normalizeTimeString(timings.Asr),
+                aksam: this.normalizeTimeString(timings.Maghrib),
+                yatsi: this.normalizeTimeString(timings.Isha)
+            },
+            hijri: entry?.date?.hijri || null
         };
     }
 
-    async selectDistrictForState(state) {
-        const districts = await this.getDistricts(state.id);
-        return this.chooseDistrict(state, districts);
-    }
-
-    async getMonthlyTimes(districtId, startDate) {
+    async getMonthlyTimes(cityName, year, month) {
+        if (!cityName) {
+            throw new Error("Şehir adı bulunamadı");
+        }
+        const encodedCity = encodeURIComponent(cityName);
         const {data = []} = await this.fetchJson(
-            `/api/prayer-times/${districtId}/monthly?startDate=${startDate}`
+            `/calendarByCity/${year}/${month}?city=${encodedCity}&country=Turkey&method=13`
         );
-        return data;
+        return data
+            .map((entry) => this.mapMonthlyEntry(entry))
+            .filter(Boolean);
     }
 }
+

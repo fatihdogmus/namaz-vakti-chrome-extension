@@ -26,18 +26,30 @@ function toISODateString(date) {
     return `${year}-${month}-${day}`;
 }
 
+function formatCityName(rawName) {
+    if (!rawName) {
+        return "";
+    }
+    const lower = rawName.toLocaleLowerCase("tr-TR");
+    return lower.replace(/\p{L}+/gu, (word) => {
+        return word.charAt(0).toLocaleUpperCase("tr-TR") + word.slice(1);
+    });
+}
+
 async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
     const {prayerCache = {}} = await storageGet(["prayerCache"]);
 
     const today = new Date();
-    const startDate = toISODateString(new Date(today.getFullYear(), today.getMonth(), 1));
-    const cacheKey = `${location.districtId}-${startDate}`;
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const cityName = location?.cityName || formatCityName(location?.stateName);
+    const cacheKey = `${cityName}-${year}-${String(month).padStart(2, "0")}`;
 
     if (!forceRefresh && prayerCache[cacheKey]?.data?.length) {
         return prayerCache[cacheKey].data;
     }
 
-    const data = await api.getMonthlyTimes(location.districtId, startDate);
+    const data = await api.getMonthlyTimes(cityName, year, month);
 
     const updatedCache = {
         ...prayerCache,
@@ -50,6 +62,7 @@ async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
     await storageSet({prayerCache: updatedCache});
     return data;
 }
+
 
 function findTimesForDate(monthlyData, date) {
     const key = toISODateString(date);
