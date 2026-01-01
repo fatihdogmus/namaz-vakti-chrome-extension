@@ -144,6 +144,48 @@ function normalizeHeader(value) {
   return map[trimmed] || toAsciiSlug(trimmed).replace(/-/g, "_");
 }
 
+function parseMiladiDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split(" ").filter(Boolean);
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const day = parts[0].padStart(2, "0");
+  const month = parts[1].toLocaleLowerCase("tr-TR");
+  const year = parts[2];
+  const months = {
+    ocak: "01",
+    subat: "02",
+    "şubat": "02",
+    mart: "03",
+    nisan: "04",
+    mayis: "05",
+    "mayıs": "05",
+    haziran: "06",
+    temmuz: "07",
+    agustos: "08",
+    ağustos: "08",
+    eylul: "09",
+    eylül: "09",
+    ekim: "10",
+    kasim: "11",
+    kasım: "11",
+    aralik: "12",
+    aralık: "12"
+  };
+
+  const monthValue = months[month];
+  if (!monthValue || !/^\d{4}$/.test(year)) {
+    return null;
+  }
+
+  return `${year}-${monthValue}-${day}`;
+}
+
 function parseExcelToJson(filePath) {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
@@ -151,13 +193,22 @@ function parseExcelToJson(filePath) {
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
   if (!rows.length) {
-    return [];
+    return {};
   }
 
-  const headers = rows[0].map(normalizeHeader);
-  const records = [];
+  const headerRowIndex = rows.findIndex((row) => {
+    const normalized = row.map(normalizeHeader).filter(Boolean);
+    return normalized.includes("miladiTarih") && normalized.includes("hicriTarih");
+  });
 
-  for (const row of rows.slice(1)) {
+  if (headerRowIndex === -1) {
+    return {};
+  }
+
+  const headers = rows[headerRowIndex].map(normalizeHeader);
+  const records = {};
+
+  for (const row of rows.slice(headerRowIndex + 1)) {
     const hasData = row.some((cell) => String(cell).trim() !== "");
     if (!hasData) {
       continue;
@@ -172,7 +223,24 @@ function parseExcelToJson(filePath) {
       record[header] = String(row[index] ?? "").trim();
     });
 
-    records.push(record);
+    if (!record.miladiTarih) {
+      continue;
+    }
+
+    const isoDate = parseMiladiDate(record.miladiTarih);
+    if (!isoDate) {
+      continue;
+    }
+
+    records[isoDate] = {
+      hicriTarih: record.hicriTarih,
+      imsak: record.imsak,
+      gunes: record.gunes,
+      ogle: record.ogle,
+      ikindi: record.ikindi,
+      aksam: record.aksam,
+      yatsi: record.yatsi
+    };
   }
 
   return records;
@@ -277,7 +345,7 @@ async function parseDownloadedExcels() {
 
 async function run() {
   try {
-    await scrape();
+    // await scrape();
     await parseDownloadedExcels();
   } catch (error) {
     console.error("Fatal error:", error);
