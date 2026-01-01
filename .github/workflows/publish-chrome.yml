@@ -64,11 +64,12 @@ jobs:
           WEBSTORE_EXTENSION_ID: ${{ secrets.WEBSTORE_EXTENSION_ID }}
         run: |
           set -euo pipefail
-          TOKEN=$(curl -s "https://oauth2.googleapis.com/token" \
-            -d "client_secret=${WEBSTORE_CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${WEBSTORE_REFRESH_TOKEN}&client_id=${WEBSTORE_CLIENT_ID}" \
-            | jq -r '.access_token')
+          TOKEN_RESPONSE=$(curl -s "https://oauth2.googleapis.com/token" \
+            -d "client_secret=${WEBSTORE_CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${WEBSTORE_REFRESH_TOKEN}&client_id=${WEBSTORE_CLIENT_ID}")
+          TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
           if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
             echo "Failed to obtain access token"
+            echo "$TOKEN_RESPONSE" | jq -r '{error, error_description}'
             exit 1
           fi
 
