@@ -26,7 +26,7 @@ const api = new PrayerTimeApi();
 let currentLocation = null;
 let countdownInterval = null;
 let countdownTarget = null;
-let currentMonthlyTimes = null;
+let currentCityTimes = null;
 
 function parsePrayerTime(timeStr, baseDate) {
     if (!timeStr || typeof timeStr !== "string") {
@@ -86,7 +86,7 @@ function clearCountdown() {
         countdownInterval = null;
     }
     countdownTarget = null;
-    currentMonthlyTimes = null;
+    currentCityTimes = null;
     if (remainingTimeEl) {
         remainingTimeEl.textContent = "--:--:--";
     }
@@ -117,11 +117,21 @@ function formatHijriFromApi(hijri) {
     return parts.join(" ");
 }
 
+function formatHijriValue(hijri) {
+    if (typeof hijri === "string") {
+        return hijri;
+    }
+    if (hijri && typeof hijri === "object") {
+        return formatHijriFromApi(hijri);
+    }
+    return "";
+}
+
 function updateHijriDate(hijri) {
     if (!hijriDateEl) {
         return;
     }
-    const text = formatHijriFromApi(hijri) || formatHijriDate(new Date());
+    const text = formatHijriValue(hijri) || formatHijriDate(new Date());
     hijriDateEl.textContent = text || "";
 }
 
@@ -153,25 +163,58 @@ function populateNotificationSelects() {
     });
 }
 
-function findTimesForDate(monthlyData, date) {
-    const key = toISODateString(date);
-    return monthlyData.find((entry) => entry?.date?.slice(0, 10) === key);
+function normalizeDayEntry(dateKey, entry) {
+    if (!entry) {
+        return null;
+    }
+    return {
+        date: dateKey,
+        times: {
+            imsak: entry.imsak,
+            gunes: entry.gunes,
+            ogle: entry.ogle,
+            ikindi: entry.ikindi,
+            aksam: entry.aksam,
+            yatsi: entry.yatsi
+        },
+        hijriText: entry.hicriTarih || ""
+    };
 }
 
+function findTimesForDate(cityData, date) {
+    const key = toISODateString(date);
+    if (!cityData) {
+        return null;
+    }
+    if (Array.isArray(cityData)) {
+        const entry = cityData.find((item) => item?.date?.slice(0, 10) === key);
+        if (!entry) {
+            return null;
+        }
+        if (entry.times) {
+            return entry;
+        }
+        return normalizeDayEntry(key, entry);
+    }
+    const entry = cityData[key];
+    return normalizeDayEntry(key, entry);
+}
+
+
 function recalculateCountdownTarget() {
-    if (!currentMonthlyTimes) {
+    if (!currentCityTimes) {
         countdownTarget = null;
         return;
     }
 
     const now = new Date();
-    const todayEntry = findTimesForDate(currentMonthlyTimes, now);
+    const todayEntry = findTimesForDate(currentCityTimes, now);
     let next = todayEntry?.times ? getNextPrayer(todayEntry.times, now) : null;
 
     if (!next) {
         const tomorrow = new Date(now);
         tomorrow.setDate(now.getDate() + 1);
-        const tomorrowEntry = findTimesForDate(currentMonthlyTimes, tomorrow);
+        const tomorrowEntry = findTimesForDate(currentCityTimes, tomorrow);
         if (tomorrowEntry?.times) {
             next = getNextPrayer(tomorrowEntry.times, now, tomorrow);
         }
@@ -207,12 +250,15 @@ function updateCountdownDisplay() {
     remainingTimeEl.textContent = formatRemainingHHmmss(remainingMs);
 }
 
-function startCountdown(monthlyTimes) {
-    currentMonthlyTimes = Array.isArray(monthlyTimes) ? monthlyTimes : null;
-    if (!currentMonthlyTimes) {
+function startCountdown(cityData) {
+    const isValid =
+        Array.isArray(cityData) || (cityData && typeof cityData === "object");
+    currentCityTimes = isValid ? cityData : null;
+    if (!currentCityTimes) {
         clearCountdown();
         return;
     }
+
 
     if (countdownInterval) {
         clearInterval(countdownInterval);
@@ -313,38 +359,17 @@ function toISODateString(date) {
     return `${year}-${month}-${day}`;
 }
 
-async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
-    const {prayerCache = {}} = await storageGet(["prayerCache"]);
-
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
+async function ensureCityTimes(location, {forceRefresh = false} = {}) {
     const cityName = location?.cityName || formatStateName(location?.stateName);
-    const cacheKey = `${cityName}-${year}-${String(month).padStart(2, "0")}`;
-
-    if (!forceRefresh && prayerCache[cacheKey]?.data?.length) {
-        return prayerCache[cacheKey].data;
-    }
-
-    const data = await api.getMonthlyTimes(cityName, year, month);
-
-    const updatedCache = {
-        ...prayerCache,
-        [cacheKey]: {
-            data,
-            fetchedAt: Date.now()
-        }
-    };
-
-    await storageSet({prayerCache: updatedCache});
-    return data;
+    return api.getCityTimes(cityName, {forceRefresh});
 }
 
 
-function findTodayTimes(monthlyData) {
+function findTodayTimes(cityData) {
     const today = new Date();
-    return findTimesForDate(monthlyData, today);
+    return findTimesForDate(cityData, today);
 }
+
 
 function applyNotificationSettings(notificationConfig = {}) {
     const allowedValues = new Set(["0", "10", "15", "20", "25", "30", "35", "40", "45"]);
@@ -406,15 +431,16 @@ async function loadAndRender(location, {forceRefresh = false} = {}) {
     setStatus("Vakitler getiriliyor...");
 
     try {
-        const monthly = await ensureMonthlyTimes(location, {forceRefresh});
-        const today = findTodayTimes(monthly);
+        const cityData = await ensureCityTimes(location, {forceRefresh});
+        const today = findTodayTimes(cityData);
         if (!today?.times) {
-            setStatus("Bugünün vakitleri bulunamadı.");
+            setStatus("Bugunun vakitleri bulunamadi.");
             return;
         }
         renderTimes(today.times);
-        startCountdown(monthly);
-        updateHijriDate(today.hijri);
+        startCountdown(cityData);
+        updateHijriDate(today.hijriText || today.hijri);
+
 
     } catch (error) {
         console.error(error);
@@ -442,7 +468,7 @@ async function saveCity(stateId) {
 
         currentLocation = location;
         hideCityModal();
-        await loadAndRender(location, {forceRefresh: true});
+        await loadAndRender(location, {forceRefresh: false});
     } catch (error) {
         console.error(error);
         setStatus("Şehir seçilirken hata oluştu.");

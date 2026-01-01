@@ -36,38 +36,48 @@ function formatCityName(rawName) {
     });
 }
 
-async function ensureMonthlyTimes(location, {forceRefresh = false} = {}) {
-    const {prayerCache = {}} = await storageGet(["prayerCache"]);
-
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
+async function ensureCityTimes(location, {forceRefresh = false} = {}) {
     const cityName = location?.cityName || formatCityName(location?.stateName);
-    const cacheKey = `${cityName}-${year}-${String(month).padStart(2, "0")}`;
+    return api.getCityTimes(cityName, {forceRefresh});
+}
 
-    if (!forceRefresh && prayerCache[cacheKey]?.data?.length) {
-        return prayerCache[cacheKey].data;
+
+function normalizeDayEntry(dateKey, entry) {
+    if (!entry) {
+        return null;
     }
-
-    const data = await api.getMonthlyTimes(cityName, year, month);
-
-    const updatedCache = {
-        ...prayerCache,
-        [cacheKey]: {
-            data,
-            fetchedAt: Date.now()
+    return {
+        date: dateKey,
+        times: {
+            imsak: entry.imsak,
+            gunes: entry.gunes,
+            ogle: entry.ogle,
+            ikindi: entry.ikindi,
+            aksam: entry.aksam,
+            yatsi: entry.yatsi
         }
     };
-
-    await storageSet({prayerCache: updatedCache});
-    return data;
 }
 
-
-function findTimesForDate(monthlyData, date) {
+function findTimesForDate(cityData, date) {
     const key = toISODateString(date);
-    return monthlyData.find((entry) => entry?.date?.slice(0, 10) === key);
+    if (!cityData) {
+        return null;
+    }
+    if (Array.isArray(cityData)) {
+        const entry = cityData.find((item) => item?.date?.slice(0, 10) === key);
+        if (!entry) {
+            return null;
+        }
+        if (entry.times) {
+            return entry;
+        }
+        return normalizeDayEntry(key, entry);
+    }
+    const entry = cityData[key];
+    return normalizeDayEntry(key, entry);
 }
+
 
 function parsePrayerTime(timeStr, baseDate) {
     if (!timeStr || typeof timeStr !== "string") {
@@ -140,7 +150,7 @@ function normalizeNotificationConfig(settings) {
     return normalized;
 }
 
-async function maybeSendNotifications(now, monthly, settings) {
+async function maybeSendNotifications(now, cityData, settings) {
     const notificationConfig = normalizeNotificationConfig(settings);
     if (!Object.keys(notificationConfig).length) {
         return;
@@ -148,10 +158,11 @@ async function maybeSendNotifications(now, monthly, settings) {
 
     const {notificationLog = {}} = await storageGet(["notificationLog"]);
 
-    const todayEntry = findTimesForDate(monthly, now);
+    const todayEntry = findTimesForDate(cityData, now);
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
-    const tomorrowEntry = findTimesForDate(monthly, tomorrow);
+    const tomorrowEntry = findTimesForDate(cityData, tomorrow);
+
 
     const windows = [
         {date: now, entry: todayEntry},
@@ -228,21 +239,22 @@ async function updateBadge() {
             return;
         }
 
-        const monthly = await ensureMonthlyTimes(location);
-        if (!Array.isArray(monthly) || !monthly.length) {
+        const cityData = await ensureCityTimes(location);
+        if (!cityData || (Array.isArray(cityData) && !cityData.length)) {
             chrome.action.setBadgeText({text: ""});
             return;
         }
 
-        await maybeSendNotifications(now, monthly, settings);
+        await maybeSendNotifications(now, cityData, settings);
 
-        const todayEntry = findTimesForDate(monthly, now);
+        const todayEntry = findTimesForDate(cityData, now);
+
         let next = todayEntry?.times ? getNextPrayer(todayEntry.times, now) : null;
 
         if (!next) {
             const tomorrow = new Date(now);
             tomorrow.setDate(now.getDate() + 1);
-            const tomorrowEntry = findTimesForDate(monthly, tomorrow);
+            const tomorrowEntry = findTimesForDate(cityData, tomorrow);
             if (tomorrowEntry?.times) {
                 next = getNextPrayer(tomorrowEntry.times, now, tomorrow);
             }

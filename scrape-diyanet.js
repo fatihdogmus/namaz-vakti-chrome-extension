@@ -89,7 +89,12 @@ const cities = [
 
 const BASE_URL = "https://namazvakitleri.diyanet.gov.tr";
 const DOWNLOAD_DIR = path.resolve(__dirname, "data");
-const DOWNLOAD_DELAY_MS = 2000;
+const DOWNLOAD_DELAY_MS = 1000;
+const HEADLESS =
+  process.env.PLAYWRIGHT_HEADLESS === "1" ||
+  process.env.PLAYWRIGHT_HEADLESS === "true";
+const CLEANUP_XLSX =
+  process.env.CLEANUP_XLSX === "1" || process.env.CLEANUP_XLSX === "true";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -261,7 +266,7 @@ function toCityLabel(value) {
 async function scrape() {
   await fs.promises.mkdir(DOWNLOAD_DIR, { recursive: true });
 
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: HEADLESS });
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
 
@@ -340,12 +345,18 @@ async function parseDownloadedExcels() {
     await fs.promises.writeFile(jsonFilePath, JSON.stringify(data));
 
     console.log(`Saved: ${jsonFilePath}`);
+
+    if (CLEANUP_XLSX) {
+      await fs.promises.unlink(filePath).catch((error) => {
+        console.warn(`Cleanup failed for ${filePath}:`, error);
+      });
+    }
   }
 }
 
 async function run() {
   try {
-    // await scrape();
+    await scrape();
     await parseDownloadedExcels();
   } catch (error) {
     console.error("Fatal error:", error);

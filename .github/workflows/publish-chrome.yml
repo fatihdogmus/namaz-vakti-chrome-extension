@@ -50,7 +50,10 @@ jobs:
       - name: Build extension zip
         run: |
           zip -r extension.zip . \
-            -x '*.git*' '.github/*' '*node_modules/*' '*.iml' '*dist/*'
+            -x '*.git*' '.github/*' '*node_modules/*' '*.iml' '*dist/*' \
+            -x 'data/*' 'data/*/*' 'pnpm-lock.yaml' 'scrape-diyanet.js' \
+            -x 'package.json' 'package-lock.json' 'npm-shrinkwrap.json' '.npmrc' 'npm-debug.log*'
+
 
       - name: Upload and publish to Chrome Web Store
         uses: Klemensas/chrome-extension-upload-action@v1.4.0
